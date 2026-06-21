@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cash Ledger (Cloud)</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --ink:#1f2733; --muted:#6b7785;
+    --line:#e2e6ec; --accent:#2f6df0; --accent-d:#1f54c9;
+    --expense:#b4322a; --income:#1b7a4b; --chip:#eef2f8;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--ink)}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px;
+         display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+  header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+  header .spacer{flex:1}
+  .who{color:var(--muted);font-size:12px;font-weight:600}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 12px;
+       border-radius:8px;cursor:pointer;font-size:13px;font-weight:550}
+  .btn:hover{background:#f7f9fc}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-d)}
+  .btn.danger{color:var(--expense);border-color:#f0d4d2}
+  .btn.danger:hover{background:#fdf3f2}
+  .btn.small{padding:4px 9px;font-size:12px}
+  .btn:disabled{opacity:.55;cursor:default}
+  nav{display:flex;gap:4px;padding:8px 16px 0}
+  nav button{border:none;background:none;padding:9px 14px;cursor:pointer;font-size:14px;
+             font-weight:600;color:var(--muted);border-bottom:2px solid transparent}
+  nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  main{max-width:1060px;margin:0 auto;padding:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+         box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+  .panel h2{margin:0 0 12px;font-size:15px;font-weight:650}
+  .grid{display:grid;gap:12px}
+  .form-row{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:10px}
+  label{color:var(--muted);font-weight:550;font-size:13px}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);
+       border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
+       box-shadow:0 0 0 3px rgba(47,109,240,.12)}
+  textarea{resize:vertical;min-height:54px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg input{display:none}
+  .seg label{padding:8px 16px;cursor:pointer;font-weight:600;color:var(--muted);
+             background:#fff;margin:0;user-select:none}
+  .seg input:checked + label.exp{background:var(--expense);color:#fff}
+  .seg input:checked + label.inc{background:var(--income);color:#fff}
+  .actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+  .combo{position:relative}
+  .combo-list{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;
+       border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);
+       max-height:260px;overflow:auto;z-index:30;display:none}
+  .combo-list.open{display:block}
+  .combo-item{padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+  .combo-item:hover,.combo-item.active{background:var(--chip)}
+  .combo-item .sub{color:var(--muted);font-size:12px}
+  .combo-empty{padding:10px;color:var(--muted);font-style:italic}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);cursor:pointer}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:#f7f9fc}
+  tbody tr.sel{background:#eaf1fe}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .exp{color:var(--expense)} .inc{color:var(--income)}
+  .table-wrap{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .pill{display:inline-block;padding:1px 8px;border-radius:99px;background:var(--chip);
+        font-size:11px;font-weight:600;color:var(--muted)}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .kpi .lbl{color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .kpi .val{font-size:24px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px}
+  .toolbar-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:12px}
+  .toolbar-filters .f{display:flex;flex-direction:column;gap:4px}
+  .toolbar-filters label{font-size:12px}
+  .toolbar-filters input,.toolbar-filters select{width:auto;padding:6px 9px}
+  .modal-bg{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;
+            align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:12px;max-width:640px;width:100%;padding:20px;
+         max-height:90vh;overflow:auto;box-shadow:0 10px 40px rgba(16,24,40,.25)}
+  .modal h3{margin:0 0 8px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2733;
+         color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .25s;z-index:60;
+         pointer-events:none;font-weight:550}
+  .toast.show{opacity:1}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  /* ---- auth screen ---- */
+  #authScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;
+              justify-content:center;padding:16px;z-index:100}
+  .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+             box-shadow:var(--shadow);padding:26px;max-width:380px;width:100%}
+  .auth-card h1{margin:0 0 4px;font-size:21px}
+  .auth-card p.sub{margin:0 0 16px;color:var(--muted);font-size:13px}
+  .auth-card label{display:block;margin:12px 0 4px}
+  .auth-actions{display:flex;gap:8px;margin-top:18px}
+  .auth-actions .btn{flex:1;text-align:center}
+  .auth-msg{margin-top:14px;font-size:13px;min-height:18px}
+  .auth-msg.err{color:var(--expense)} .auth-msg.ok{color:var(--income)}
+  .hidden{display:none!important}
+  @media(max-width:620px){.form-row{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="authScreen">
+  <div class="auth-card">
+    <h1>Cash Ledger</h1>
+    <p class="sub">Sign in to your cloud ledger.</p>
+    <label for="authEmail">Email</label>
+    <input type="email" id="authEmail" autocomplete="username" placeholder="you@example.com">
+    <label for="authPass">Password</label>
+    <input type="password" id="authPass" autocomplete="current-password" placeholder="••••••••">
+    <div class="auth-actions">
+      <button class="btn primary" id="btnSignIn">Sign in</button>
+      <button class="btn" id="btnSignUp">Create account</button>
+    </div>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="hidden">
+<header>
+  <h1 id="appTitle">Cash Ledger</h1>
+  <span class="pill" id="countPill"></span>
+  <span class="spacer"></span>
+  <span class="who" id="whoLabel"></span>
+  <button class="btn small" id="btnImport">Import / Paste</button>
+  <button class="btn small" id="btnExport">Export CSV</button>
+  <button class="btn small" id="btnBackup">Backup</button>
+  <button class="btn small" id="btnSettings">⚙</button>
+  <button class="btn small" id="btnSignOut">Sign out</button>
+</header>
+
+<nav>
+  <button data-tab="entries" class="active">Entries</button>
+  <button data-tab="accounts">Accounts</button>
+  <button data-tab="reports">Reports</button>
+</nav>
+
+<main>
+  <!-- ENTRIES -->
+  <section id="tab-entries">
+    <div class="panel">
+      <h2 id="entryFormTitle">New Entry</h2>
+      <div class="grid" style="max-width:560px">
+        <div class="form-row">
+          <label for="eDate">Date</label>
+          <input type="date" id="eDate">
+        </div>
+        <div class="form-row">
+          <label for="acctSearch">Account</label>
+          <div class="combo">
+            <input type="text" id="acctSearch" autocomplete="off" placeholder="Type to filter accounts…">
+            <input type="hidden" id="eAccount">
+            <div class="combo-list" id="acctList"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Type</label>
+          <div class="seg">
+            <input type="radio" name="etype" id="tExp" value="expense" checked>
+            <label class="exp" for="tExp">Expense</label>
+            <input type="radio" name="etype" id="tInc" value="income">
+            <label class="inc" for="tInc">Income</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label for="eAmount">Amount</label>
+          <input type="number" id="eAmount" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="form-row">
+          <label for="eNotes">Notes</label>
+          <textarea id="eNotes" maxlength="255" placeholder="Optional (max 255)"></textarea>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnSaveEntry">Save Entry</button>
+          <button class="btn" id="btnNewEntry">New / Clear</button>
+          <button class="btn danger" id="btnDelEntry" style="display:none">Delete</button>
+          <span class="hint" id="signHint">Stored as positive (expense), per your convention.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>All Entries <span class="muted" style="font-weight:400">— newest first, click a row to edit</span></h2>
+      <div class="toolbar-filters">
+        <div class="f"><label>Search notes/account</label><input type="text" id="entrySearch" placeholder="filter…"></div>
+      </div>
+      <div class="table-wrap">
+        <table id="entriesTable">
+          <thead><tr>
+            <th>Date</th><th>Account</th><th>Category</th><th class="num">Amount</th><th>Notes</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACCOUNTS -->
+  <section id="tab-accounts" style="display:none">
+    <div class="panel">
+      <h2 id="acctFormTitle">New Account</h2>
+      <div class="grid" style="max-width:560px">
+        <div class="form-row"><label for="aAccount">Account</label><input type="text" id="aAccount" maxlength="100"></div>
+        <div class="form-row"><label for="aEntity">Entity</label><input type="text" id="aEntity" maxlength="15"></div>
+        <div class="form-row"><label for="aCategory">Category</label><input type="text" id="aCategory" maxlength="50"></div>
+        <div class="form-row"><label for="aSub">SubCategory</label><input type="text" id="aSub" maxlength="50"></div>
+        <div class="form-row"><label for="aVenture">Venture</label><input type="text" id="aVenture" maxlength="50"></div>
+        <div class="form-row"><label for="aBusiness">Business (Y/N)</label>
+          <select id="aBusiness"><option>N</option><option>Y</option></select></div>
+        <div class="form-row"><label for="aActive">Active (Y/N)</label>
+          <select id="aActive"><option>Y</option><option>N</option></select></div>
+        <div class="actions">
+          <button class="btn primary" id="btnSaveAcct">Save Account</button>
+          <button class="btn" id="btnNewAcct">New / Clear</button>
+          <button class="btn danger" id="btnDelAcct" style="display:none">Delete</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Accounts</h2>
+      <div class="toolbar-filters">
+        <div class="f"><label>Search</label><input type="text" id="acctTableSearch" placeholder="filter…"></div>
+        <div class="f"><label><input type="checkbox" id="acctActiveOnly" style="width:auto;vertical-align:-1px"> Active only</label></div>
+      </div>
+      <div class="table-wrap">
+        <table id="accountsTable">
+          <thead><tr>
+            <th>Account</th><th>Entity</th><th>Category</th><th>SubCategory</th>
+            <th>Venture</th><th>Biz</th><th>Active</th><th class="num">Entries</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section id="tab-reports" style="display:none">
+    <div class="panel">
+      <div class="toolbar-filters">
+        <div class="f"><label>From</label><input type="date" id="rFrom"></div>
+        <div class="f"><label>To</label><input type="date" id="rTo"></div>
+        <div class="f"><label>Group by</label>
+          <select id="rGroup"><option value="Category">Category</option>
+            <option value="Entity">Entity</option><option value="SubCategory">SubCategory</option>
+            <option value="Venture">Venture</option><option value="Account">Account</option></select></div>
+        <div class="f"><label><input type="checkbox" id="rActiveOnly" style="width:auto;vertical-align:-1px"> Active accounts only</label></div>
+        <div class="f"><button class="btn small" id="btnClearDates">Clear dates</button></div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">Income</div><div class="val inc" id="kIncome">—</div></div>
+        <div class="kpi"><div class="lbl">Expenses</div><div class="val exp" id="kExpense">—</div></div>
+        <div class="kpi"><div class="lbl">Net (Income − Expenses)</div><div class="val" id="kNet">—</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 id="grpTitle">By Category</h2>
+      <div class="table-wrap">
+        <table id="groupTable">
+          <thead><tr><th id="grpCol">Category</th><th class="num">Income</th><th class="num">Expenses</th><th class="num">Net</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Monthly Net</h2>
+      <div class="table-wrap">
+        <table id="monthTable">
+          <thead><tr><th>Month</th><th class="num">Income</th><th class="num">Expenses</th><th class="num">Net</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+</div><!-- /#app -->
+
+<!-- IMPORT MODAL -->
+<div class="modal-bg" id="importModal">
+  <div class="modal">
+    <h3>Import / Paste data</h3>
+    <p class="muted">Paste tab- or comma-separated rows (e.g. copied straight from Access or Excel). Load <b>Accounts first</b>, then Entries.</p>
+    <div class="row2" style="margin-bottom:10px">
+      <div><label>Target</label>
+        <select id="impTarget">
+          <option value="accounts">Accounts</option>
+          <option value="entries">Entries</option>
+        </select></div>
+      <div><label>Mode</label>
+        <select id="impMode"><option value="append">Append</option><option value="replace">Replace all</option></select></div>
+    </div>
+    <p class="hint" id="impCols"></p>
+    <label><input type="checkbox" id="impHeader" style="width:auto;vertical-align:-1px"> First row is a header (skip it)</label>
+    <textarea id="impText" style="min-height:160px;margin-top:8px" placeholder="Paste here…"></textarea>
+    <div class="actions" style="justify-content:flex-end">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="btnDoImport">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h3>Settings</h3>
+    <div class="row2">
+      <div><label>Ledger title</label><input type="text" id="setTitle"></div>
+      <div><label>Currency symbol</label><input type="text" id="setCurrency" maxlength="3"></div>
+    </div>
+    <p class="hint">These are saved on this device only (display preferences).</p>
+    <div class="actions" style="justify-content:flex-end;margin-top:14px">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="btnSaveSettings">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Supabase client library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   CONFIG — your Supabase project. The publishable key is meant
+   to be public; row-level security is what protects the data.
+   ============================================================ */
+const SUPABASE_URL = "https://uyvnudysqarxuoneydzb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_mT1AkxPOkExQYIECNRf2dg_IBaoHRyO";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const SKEY = "cashLedgerCloud.settings.v1";   // device-only display prefs
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+
+/* in-memory cache of the signed-in user's rows (UI shape, capitalized keys) */
+let state={accounts:[],entries:[],settings:{title:"Cash Ledger",currency:"$"}};
+let editEntryId=null, editAcctKey=null, comboActive=-1;
+
+/* map database rows (snake_case) <-> UI shape (the original app's keys) */
+const acctFromDb = r=>({Account:r.account,Entity:r.entity||"",Category:r.category||"",
+  SubCategory:r.subcategory||"",Venture:r.venture||"",Business:r.business||"N",Active:r.active||"Y"});
+const entryFromDb = r=>({ID:r.id,Date:r.date,Account:r.account,Amount:Number(r.amount),Notes:r.notes||""});
+
+/* ---------- helpers ---------- */
+const todayISO=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+function money(n){const s=state.settings.currency||"$";const neg=n<0;
+  const v=Math.abs(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (neg?"-":"")+s+v;}
+function acctByName(name){return state.accounts.find(a=>a.Account===name);}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2200);}
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+function authMsg(text,kind){const m=$("#authMsg");m.textContent=text||"";m.className="auth-msg"+(kind?" "+kind:"");}
+function showAuth(){$("#app").classList.add("hidden");$("#authScreen").classList.remove("hidden");}
+function showApp(session){
+  $("#authScreen").classList.add("hidden");$("#app").classList.remove("hidden");
+  $("#whoLabel").textContent=session.user.email;
+  loadData();
+}
+$("#btnSignIn").onclick=async()=>{
+  const email=$("#authEmail").value.trim(), password=$("#authPass").value;
+  if(!email||!password){authMsg("Enter email and password","err");return;}
+  authMsg("Signing in…");
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error){authMsg(error.message,"err");return;}
+  authMsg("");   // onAuthStateChange will show the app
+};
+$("#btnSignUp").onclick=async()=>{
+  const email=$("#authEmail").value.trim(), password=$("#authPass").value;
+  if(!email||!password){authMsg("Enter an email and a password (min 6 chars)","err");return;}
+  authMsg("Creating account…");
+  const {data,error}=await sb.auth.signUp({email,password});
+  if(error){authMsg(error.message,"err");return;}
+  if(data.session){authMsg("Account created — signing you in…","ok");}
+  else{authMsg("Account created. Check your email to confirm, then sign in.","ok");}
+};
+$("#authPass").addEventListener("keydown",e=>{if(e.key==="Enter")$("#btnSignIn").click();});
+$("#btnSignOut").onclick=async()=>{await sb.auth.signOut();};
+
+/* react to login/logout */
+sb.auth.onAuthStateChange((_evt,session)=>{ if(session) showApp(session); else showAuth(); });
+
+/* ============================================================
+   DATA LOADING (read the signed-in user's rows from Supabase)
+   ============================================================ */
+async function loadData(){
+  const [aRes,eRes]=await Promise.all([
+    sb.from("accounts").select("*").order("account",{ascending:true}),
+    sb.from("entries").select("*").order("date",{ascending:false}).order("id",{ascending:false})
+  ]);
+  if(aRes.error){toast("Error loading accounts: "+aRes.error.message);return;}
+  if(eRes.error){toast("Error loading entries: "+eRes.error.message);return;}
+  state.accounts=(aRes.data||[]).map(acctFromDb);
+  state.entries=(eRes.data||[]).map(entryFromDb);
+  renderAll();
+}
+
+/* ---------- tabs ---------- */
+$$("nav button").forEach(b=>b.onclick=()=>{
+  $$("nav button").forEach(x=>x.classList.toggle("active",x===b));
+  ["entries","accounts","reports"].forEach(t=>$("#tab-"+t).style.display=t===b.dataset.tab?"":"none");
+  if(b.dataset.tab==="reports") renderReports();
+  if(b.dataset.tab==="accounts") renderAccounts();
+});
+
+/* ================= ENTRIES ================= */
+function clearEntryForm(){
+  editEntryId=null; $("#entryFormTitle").textContent="New Entry";
+  $("#eDate").value=todayISO(); $("#acctSearch").value=""; $("#eAccount").value="";
+  $("#tExp").checked=true; $("#eAmount").value=""; $("#eNotes").value="";
+  $("#btnDelEntry").style.display="none"; updateSignHint();
+}
+function updateSignHint(){
+  const exp=$("#tExp").checked;
+  $("#signHint").textContent=exp?"Stored as positive (expense), per your convention."
+                                :"Stored as negative (income), per your convention.";
+}
+$("#tExp").onchange=$("#tInc").onchange=updateSignHint;
+
+$("#btnSaveEntry").onclick=async()=>{
+  const acct=$("#eAccount").value;
+  if(!acct||!acctByName(acct)){toast("Pick a valid account from the list");$("#acctSearch").focus();return;}
+  const amtRaw=parseFloat($("#eAmount").value);
+  if(isNaN(amtRaw)||amtRaw<0){toast("Enter a valid amount");$("#eAmount").focus();return;}
+  const signed=$("#tExp").checked?Math.abs(amtRaw):-Math.abs(amtRaw);
+  const payload={date:$("#eDate").value||todayISO(),account:acct,amount:signed,notes:$("#eNotes").value.trim()};
+  let error;
+  if(editEntryId!=null){({error}=await sb.from("entries").update(payload).eq("id",editEntryId));}
+  else{({error}=await sb.from("entries").insert(payload));}
+  if(error){toast("Save failed: "+error.message);return;}
+  await loadData(); clearEntryForm(); toast("Saved");
+};
+$("#btnNewEntry").onclick=clearEntryForm;
+$("#btnDelEntry").onclick=async()=>{
+  if(editEntryId==null) return;
+  if(!confirm("Delete this entry?")) return;
+  const {error}=await sb.from("entries").delete().eq("id",editEntryId);
+  if(error){toast("Delete failed: "+error.message);return;}
+  await loadData(); clearEntryForm(); toast("Deleted");
+};
+
+function loadEntry(id){
+  const e=state.entries.find(x=>x.ID===id); if(!e) return;
+  editEntryId=id; $("#entryFormTitle").textContent="Edit Entry #"+id;
+  $("#eDate").value=e.Date; $("#eAccount").value=e.Account; $("#acctSearch").value=e.Account;
+  const inc=e.Amount<0; $("#tInc").checked=inc; $("#tExp").checked=!inc;
+  $("#eAmount").value=Math.abs(e.Amount); $("#eNotes").value=e.Notes||"";
+  $("#btnDelEntry").style.display=""; updateSignHint();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+$("#entrySearch").oninput=renderEntries;
+function renderEntries(){
+  const q=$("#entrySearch").value.toLowerCase().trim();
+  const rows=[...state.entries].sort((a,b)=> (b.Date||"").localeCompare(a.Date||"") || b.ID-a.ID)
+    .filter(e=>!q || (e.Account+" "+(e.Notes||"")).toLowerCase().includes(q));
+  const tb=$("#entriesTable tbody");
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="5" class="empty">${state.entries.length?"No matches.":"No entries yet — add accounts first, then start logging."}</td></tr>`;}
+  else tb.innerHTML=rows.map(e=>{
+    const a=acctByName(e.Account); const cls=e.Amount<0?"inc":"exp";
+    return `<tr data-id="${e.ID}" class="${e.ID===editEntryId?'sel':''}">
+      <td>${esc(e.Date)}</td><td>${esc(e.Account)}</td><td>${esc(a?a.Category:"")}</td>
+      <td class="num ${cls}">${money(e.Amount)}</td><td>${esc(e.Notes)}</td></tr>`;}).join("");
+  tb.querySelectorAll("tr[data-id]").forEach(tr=>tr.onclick=()=>loadEntry(+tr.dataset.id));
+  $("#countPill").textContent=state.entries.length+" entries · "+state.accounts.length+" accounts";
+}
+
+/* ---------- account combo (contains filter) ---------- */
+const search=$("#acctSearch"), list=$("#acctList");
+function openCombo(){
+  const q=search.value.toLowerCase().trim();
+  const matches=state.accounts
+    .filter(a=>a.Active!=="N"||a.Account===$("#eAccount").value)
+    .filter(a=>!q || (a.Account+" "+a.Category+" "+a.Entity+" "+a.SubCategory+" "+a.Venture).toLowerCase().includes(q))
+    .slice(0,50);
+  comboActive=-1;
+  if(!state.accounts.length){list.innerHTML=`<div class="combo-empty">No accounts yet — add some in the Accounts tab.</div>`;}
+  else if(!matches.length){list.innerHTML=`<div class="combo-empty">No accounts contain "${esc(q)}"</div>`;}
+  else list.innerHTML=matches.map(a=>`<div class="combo-item" data-acct="${esc(a.Account)}">
+      <span>${esc(a.Account)}</span><span class="sub">${esc([a.Category,a.Entity].filter(Boolean).join(" · "))}</span></div>`).join("");
+  list.classList.add("open");
+  list.querySelectorAll(".combo-item").forEach(it=>it.onmousedown=e=>{e.preventDefault();pick(it.dataset.acct);});
+}
+function pick(name){$("#eAccount").value=name;search.value=name;list.classList.remove("open");$("#eAmount").focus();}
+search.oninput=openCombo;
+search.onfocus=openCombo;
+search.onblur=()=>setTimeout(()=>list.classList.remove("open"),150);
+search.onkeydown=e=>{
+  const items=[...list.querySelectorAll(".combo-item")];
+  if(e.key==="ArrowDown"){e.preventDefault();comboActive=Math.min(comboActive+1,items.length-1);}
+  else if(e.key==="ArrowUp"){e.preventDefault();comboActive=Math.max(comboActive-1,0);}
+  else if(e.key==="Enter"&&comboActive>=0){e.preventDefault();pick(items[comboActive].dataset.acct);return;}
+  else if(e.key==="Escape"){list.classList.remove("open");return;}
+  items.forEach((it,i)=>it.classList.toggle("active",i===comboActive));
+  if(items[comboActive])items[comboActive].scrollIntoView({block:"nearest"});
+};
+
+/* ================= ACCOUNTS ================= */
+function clearAcctForm(){
+  editAcctKey=null; $("#acctFormTitle").textContent="New Account";
+  ["aAccount","aEntity","aCategory","aSub","aVenture"].forEach(id=>$("#"+id).value="");
+  $("#aBusiness").value="N"; $("#aActive").value="Y"; $("#btnDelAcct").style.display="none";
+}
+$("#btnSaveAcct").onclick=async()=>{
+  const name=$("#aAccount").value.trim();
+  if(!name){toast("Account name required");return;}
+  const dup=state.accounts.find(a=>a.Account===name);
+  if(dup && name!==editAcctKey){toast("An account with that name already exists");return;}
+  const payload={account:name,entity:$("#aEntity").value.trim(),category:$("#aCategory").value.trim(),
+    subcategory:$("#aSub").value.trim(),venture:$("#aVenture").value.trim(),
+    business:$("#aBusiness").value,active:$("#aActive").value};
+  let error;
+  if(editAcctKey!=null){
+    // renaming the account cascades to its entries automatically in the database
+    ({error}=await sb.from("accounts").update(payload).eq("account",editAcctKey));
+  }else{({error}=await sb.from("accounts").insert(payload));}
+  if(error){toast("Save failed: "+error.message);return;}
+  await loadData(); clearAcctForm(); toast("Saved");
+};
+$("#btnNewAcct").onclick=clearAcctForm;
+$("#btnDelAcct").onclick=async()=>{
+  if(editAcctKey==null) return;
+  const used=state.entries.filter(e=>e.Account===editAcctKey).length;
+  if(used){toast(`Can't delete — ${used} entr${used==1?"y":"ies"} use this account`);return;}
+  if(!confirm("Delete this account?")) return;
+  const {error}=await sb.from("accounts").delete().eq("account",editAcctKey);
+  if(error){toast("Delete failed: "+error.message);return;}
+  await loadData(); clearAcctForm(); toast("Deleted");
+};
+function loadAcct(name){
+  const a=acctByName(name); if(!a) return;
+  editAcctKey=name; $("#acctFormTitle").textContent="Edit Account";
+  $("#aAccount").value=a.Account;$("#aEntity").value=a.Entity||"";$("#aCategory").value=a.Category||"";
+  $("#aSub").value=a.SubCategory||"";$("#aVenture").value=a.Venture||"";
+  $("#aBusiness").value=a.Business==="Y"?"Y":"N";$("#aActive").value=a.Active==="N"?"N":"Y";
+  $("#btnDelAcct").style.display=""; window.scrollTo({top:0,behavior:"smooth"});
+}
+$("#acctTableSearch").oninput=renderAccounts;
+$("#acctActiveOnly").onchange=renderAccounts;
+function renderAccounts(){
+  const q=$("#acctTableSearch").value.toLowerCase().trim();
+  const activeOnly=$("#acctActiveOnly").checked;
+  const counts={}; state.entries.forEach(e=>counts[e.Account]=(counts[e.Account]||0)+1);
+  const rows=[...state.accounts].sort((a,b)=>a.Account.localeCompare(b.Account))
+    .filter(a=>!activeOnly||a.Active!=="N")
+    .filter(a=>!q||(a.Account+" "+a.Entity+" "+a.Category+" "+a.SubCategory+" "+a.Venture).toLowerCase().includes(q));
+  const tb=$("#accountsTable tbody");
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="empty">${state.accounts.length?"No matches.":"No accounts yet — add one above, or use Import / Paste."}</td></tr>`;}
+  else tb.innerHTML=rows.map(a=>`<tr data-acct="${esc(a.Account)}">
+    <td>${esc(a.Account)}</td><td>${esc(a.Entity)}</td><td>${esc(a.Category)}</td><td>${esc(a.SubCategory)}</td>
+    <td>${esc(a.Venture)}</td><td>${a.Business==="Y"?'<span class="pill">Y</span>':"N"}</td>
+    <td>${a.Active==="N"?'<span class="pill">N</span>':"Y"}</td>
+    <td class="num">${counts[a.Account]||0}</td></tr>`).join("");
+  tb.querySelectorAll("tr[data-acct]").forEach(tr=>tr.onclick=()=>loadAcct(tr.dataset.acct));
+  $("#countPill").textContent=state.entries.length+" entries · "+state.accounts.length+" accounts";
+}
+
+/* ================= REPORTS ================= */
+$("#rFrom").onchange=$("#rTo").onchange=$("#rGroup").onchange=$("#rActiveOnly").onchange=renderReports;
+$("#btnClearDates").onclick=()=>{$("#rFrom").value="";$("#rTo").value="";renderReports();};
+function renderReports(){
+  const from=$("#rFrom").value, to=$("#rTo").value, grp=$("#rGroup").value, activeOnly=$("#rActiveOnly").checked;
+  const ents=state.entries.filter(e=>{
+    if(from&&e.Date<from) return false; if(to&&e.Date>to) return false;
+    if(activeOnly){const a=acctByName(e.Account); if(a&&a.Active==="N") return false;}
+    return true;
+  });
+  let inc=0,exp=0;
+  ents.forEach(e=>{ if(e.Amount<0) inc+=-e.Amount; else exp+=e.Amount; });
+  $("#kIncome").textContent=money(inc); $("#kExpense").textContent=money(exp);
+  const net=inc-exp; const kn=$("#kNet"); kn.textContent=money(net);
+  kn.className="val "+(net>=0?"inc":"exp");
+
+  // group
+  $("#grpTitle").textContent="By "+grp; $("#grpCol").textContent=grp;
+  const g={};
+  ents.forEach(e=>{
+    const a=acctByName(e.Account); const key=(grp==="Account"?e.Account:(a?a[grp]:""))||"(unassigned)";
+    g[key]=g[key]||{inc:0,exp:0}; if(e.Amount<0)g[key].inc+=-e.Amount; else g[key].exp+=e.Amount;
+  });
+  const grows=Object.entries(g).sort((a,b)=>(b[1].inc+b[1].exp)-(a[1].inc+a[1].exp));
+  const gtb=$("#groupTable tbody");
+  gtb.innerHTML=grows.length?grows.map(([k,v])=>{const n=v.inc-v.exp;
+    return `<tr><td>${esc(k)}</td><td class="num inc">${money(v.inc)}</td>
+      <td class="num exp">${money(v.exp)}</td><td class="num ${n>=0?'inc':'exp'}">${money(n)}</td></tr>`;}).join("")
+    :`<tr><td colspan="4" class="empty">No data in range.</td></tr>`;
+
+  // monthly
+  const m={};
+  ents.forEach(e=>{const k=(e.Date||"").slice(0,7)||"(no date)"; m[k]=m[k]||{inc:0,exp:0};
+    if(e.Amount<0)m[k].inc+=-e.Amount; else m[k].exp+=e.Amount;});
+  const mrows=Object.entries(m).sort((a,b)=>b[0].localeCompare(a[0]));
+  const mtb=$("#monthTable tbody");
+  mtb.innerHTML=mrows.length?mrows.map(([k,v])=>{const n=v.inc-v.exp;
+    return `<tr><td>${esc(k)}</td><td class="num inc">${money(v.inc)}</td>
+      <td class="num exp">${money(v.exp)}</td><td class="num ${n>=0?'inc':'exp'}">${money(n)}</td></tr>`;}).join("")
+    :`<tr><td colspan="4" class="empty">No data in range.</td></tr>`;
+}
+
+/* ================= EXPORT / BACKUP ================= */
+function download(name,text,type){
+  const blob=new Blob([text],{type:type||"text/plain"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function csvCell(v){v=v==null?"":String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function toCSV(rows){return rows.map(r=>r.map(csvCell).join(",")).join("\r\n");}
+$("#btnExport").onclick=()=>{
+  const eRows=[["ID","Date","Account","Amount","Notes"],
+    ...[...state.entries].sort((a,b)=>(a.Date||"").localeCompare(b.Date||"")).map(e=>[e.ID,e.Date,e.Account,e.Amount,e.Notes])];
+  download("ledger-entries.csv",toCSV(eRows),"text/csv");
+  const aRows=[["Account","Entity","Category","SubCategory","Venture","Business","Active"],
+    ...state.accounts.map(a=>[a.Account,a.Entity,a.Category,a.SubCategory,a.Venture,a.Business,a.Active])];
+  download("ledger-accounts.csv",toCSV(aRows),"text/csv");
+  toast("Exported 2 CSV files");
+};
+$("#btnBackup").onclick=()=>{
+  download("ledger-backup-"+todayISO()+".json",
+    JSON.stringify({accounts:state.accounts,entries:state.entries},null,2),"application/json");
+  toast("Backup saved");
+};
+
+/* ================= IMPORT / PASTE ================= */
+const impCols={accounts:"Columns: Account, Entity, Category, SubCategory, Venture, Business(Y/N), Active(Y/N)",
+               entries:"Columns: Date (YYYY-MM-DD), Account, Amount (+expense / −income), Notes"};
+$("#btnImport").onclick=()=>{openModal("#importModal");updImpCols();};
+$("#impTarget").onchange=updImpCols;
+function updImpCols(){$("#impCols").textContent=impCols[$("#impTarget").value];}
+function splitRow(line){return line.includes("\t")?line.split("\t"):line.split(",").map(s=>s.replace(/^"|"$/g,""));}
+async function clearAllOwn(tableName){
+  // RLS already limits delete to the user's own rows; the filter just satisfies the "must have a filter" rule
+  return sb.from(tableName).delete().gte("created_at","1900-01-01T00:00:00Z");
+}
+$("#btnDoImport").onclick=async()=>{
+  const target=$("#impTarget").value, mode=$("#impMode").value;
+  let lines=$("#impText").value.split(/\r?\n/).filter(l=>l.trim()!=="");
+  if($("#impHeader").checked) lines=lines.slice(1);
+  if(!lines.length){toast("Nothing to import");return;}
+  if(mode==="replace" && !confirm("Replace all "+target+"?")) return;
+
+  if(target==="accounts"){
+    const rows=lines.map(l=>{const c=splitRow(l); const name=(c[0]||"").trim(); if(!name) return null;
+      return {account:name,entity:(c[1]||"").trim(),category:(c[2]||"").trim(),subcategory:(c[3]||"").trim(),
+        venture:(c[4]||"").trim(),business:(c[5]||"").trim().toUpperCase()==="Y"?"Y":"N",
+        active:(c[6]||"").trim().toUpperCase()==="N"?"N":"Y"};}).filter(Boolean);
+    if(mode==="replace"){const {error}=await clearAllOwn("accounts"); if(error){toast("Clear failed: "+error.message);return;}}
+    if(rows.length){const {error}=await sb.from("accounts").upsert(rows,{onConflict:"user_id,account"});
+      if(error){toast("Import failed: "+error.message);return;}}
+    toast("Imported "+rows.length+" accounts");
+  }else{
+    const rows=lines.map(l=>{const c=splitRow(l);
+      const amt=parseFloat((c[2]||"").replace(/[^0-9.\-]/g,"")); if(isNaN(amt)) return null;
+      return {date:(c[0]||todayISO()).trim(),account:(c[1]||"").trim(),amount:amt,notes:(c[3]||"").trim()};}).filter(Boolean);
+    if(mode==="replace"){const {error}=await clearAllOwn("entries"); if(error){toast("Clear failed: "+error.message);return;}}
+    if(rows.length){const {error}=await sb.from("entries").insert(rows);
+      if(error){toast("Import failed: "+error.message+" (load Accounts first?)");return;}}
+    toast("Imported "+rows.length+" entries");
+  }
+  $("#impText").value=""; closeModals(); await loadData();
+};
+
+/* ================= SETTINGS (device-only) ================= */
+function loadSettings(){try{const r=localStorage.getItem(SKEY); if(r) state.settings=Object.assign(state.settings,JSON.parse(r));}catch(e){}}
+function saveSettings(){localStorage.setItem(SKEY,JSON.stringify(state.settings));}
+$("#btnSettings").onclick=()=>{$("#setTitle").value=state.settings.title;$("#setCurrency").value=state.settings.currency;openModal("#settingsModal");};
+$("#btnSaveSettings").onclick=()=>{
+  state.settings.title=$("#setTitle").value.trim()||"Cash Ledger";
+  state.settings.currency=$("#setCurrency").value.trim()||"$";
+  saveSettings(); applySettings(); closeModals(); renderAll(); toast("Settings saved");
+};
+function applySettings(){$("#appTitle").textContent=state.settings.title;document.title=state.settings.title;}
+
+/* ---------- modal plumbing ---------- */
+function openModal(sel){$(sel).classList.add("open");}
+function closeModals(){$$(".modal-bg").forEach(m=>m.classList.remove("open"));}
+$$("[data-close]").forEach(b=>b.onclick=closeModals);
+$$(".modal-bg").forEach(m=>m.onclick=e=>{if(e.target===m)closeModals();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModals();});
+
+/* ---------- boot ---------- */
+function renderAll(){renderEntries();renderAccounts();renderReports();}
+loadSettings(); applySettings(); clearEntryForm(); clearAcctForm(); $("#rTo").value="";
+// decide: show login or app, based on any existing session
+sb.auth.getSession().then(({data:{session}})=>{ if(session) showApp(session); else showAuth(); });
+</script>
+</body>
+</html>
